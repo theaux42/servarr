@@ -1,0 +1,155 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 8080:8080 # qBittorrent
+      - 9696:9696 # Prowlarr
+      - 8989:8989 # Sonarr
+      - 7878:7878 # Radarr
+      - 8191:8191 # Flaresolverr
+      - 5055:5055 # Seerr
+      - 8715:8715 # Ygege
+      - 7476:7476 # Qui
+    environment:
+      - VPN_SERVICE_PROVIDER=${VPN_PROVIDER}
+      - VPN_TYPE=${VPN_TYPE}
+      - WIREGUARD_PRIVATE_KEY=${VPN_PRIVATE_KEY}
+      - SERVER_COUNTRIES=${VPN_SRV_COUNTRIES}
+      - VPN_PORT_FORWARDING=${VPN_PORT_FORWARDING}
+      - VPN_PORT_FORWARDING_PROVIDER=${VPN_PF_PROVIDER}
+      - DNS_ADDRESS=${DNS_ADDRESS}
+      - DOT=${DOT}
+    restart: unless-stopped
+
+  jellyseerr:
+    image: ghcr.io/fallenbagel/jellyseerr:latest
+    init: true
+    container_name: jellyseerr
+    network_mode: "service:gluetun"
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TIMEZONE}
+    volumes:
+      - /opt/config/seerr:/app/config
+    depends_on:
+      - gluetun
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+      - WEBUI_PORT=8080
+    volumes:
+      - /opt/config/qbittorrent:/config
+      - /data:/data
+      - /data/downloads:/downloads
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  flaresolverr:
+    image: flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    network_mode: "service:gluetun"
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TIMEZONE}
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  prowlarr:
+    image: ghcr.io/almottier/prowlarr-ygg
+    container_name: prowlarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    volumes:
+      - /opt/config/prowlarr:/config
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    volumes:
+      - /opt/config/sonarr:/config
+      - /data:/data
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+    volumes:
+      - /opt/config/radarr:/config
+      - /data:/data
+    depends_on:
+      - gluetun
+    restart: unless-stopped
+
+  ygege:
+    image: uwucode/ygege:latest
+    container_name: ygege
+    network_mode: "service:gluetun"
+    environment:
+      - YGG_USERNAME=${YGG_USERNAME}
+      - YGG_PASSWORD=${YGG_PASSWORD}
+      - LOG_LEVEL=debug
+    volumes:
+      - /opt/config/ygege:/config
+    depends_on:
+      - gluetun
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8715/health || exit 1"]
+      interval: 1m30s
+      timeout: 20s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  qui:
+    image: ghcr.io/autobrr/qui:latest
+    container_name: qui
+    network_mode: "service:gluetun"
+    volumes:
+      - /opt/config/qui:/app/data
+      - /opt/config/qbittorrent:/qbittorrent
+    environment:
+      - QBITTORRENT_HOST=${QBIT_HOSTNAME}
+      - QBITTORRENT_USERNAME=${QBIT_USERNAME}
+      - QBITTORRENT_PASSWORD=${QBIT_PASSWORD}
+    depends_on:
+      - gluetun
+      - qbittorrent
+    restart: unless-stopped
