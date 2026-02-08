@@ -7,7 +7,7 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     volumes:
-      - /tmp:/tmp/gluetun
+      - /opt/config/gluetun:/tmp/gluetun
     ports:
       - 8080:8080 # qBittorrent
       - 9696:9696 # Prowlarr
@@ -145,7 +145,7 @@ services:
     container_name: qui
     network_mode: "service:gluetun"
     volumes:
-      - /opt/config/qui:/app/data
+      - /opt/config/qui:/config
       - /opt/config/qbittorrent:/qbittorrent
     environment:
       - QBITTORRENT_HOST=${QBIT_HOSTNAME}
@@ -160,7 +160,7 @@ services:
     image: snoringdragon/gluetun-qbittorrent-port-manager:latest
     restart: unless-stopped
     volumes:
-      - /tmp:/tmp/gluetun #Set "yourfolder" to the same directory you used for Gluetun
+      - /opt/config/gluetun:/tmp/gluetun
     network_mode: "service:gluetun"
     environment:
       QBITTORRENT_SERVER: localhost # IP Address of qbittorrent
